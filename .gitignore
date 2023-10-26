@@ -1,0 +1,34 @@
+# Ignore Vagrant log files and directories
+.vagrant/
+logs/
+
+# Ignore VirtualBox files
+*.vbox
+*.vbox-prev
+*.vdi
+*.vdi-prev
+
+# Ignore package boxes
+*.box
+
+# Ignore provisioned files
+*.provisioned.*
+
+# Ignore temporary files
+*~
+
+# Ignore .vagrant environment-specific configuration file
+.vagrant.yml
+
+# Ignore .vagrant.d folder (may contain plugins, etc.)
+.vagrant.d/
+
+# Ignore SSH keys
+*.pub
+*.key
+*.pem
+
+# Ignore any other project-specific files or directories you want to exclude
+
+# Ignore windows executable files
+*.exe
