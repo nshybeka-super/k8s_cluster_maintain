@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "k8s-cluster-maintain"
+version = "0.1.0"
+description = "This is a project for create VM nodes in Vitrualbox and provision them with Ansible"
+authors = ["Aliaskei Shybeka <aliaksei_shybeka@epam.com>"]
+license = "mega license!"
+readme = "README.md"
+packages = [{include = "k8s_cluster_maintain"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+ansible = "^8.5.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

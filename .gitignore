@@ -32,3 +32,6 @@ logs/
 
 # Ignore windows executable files
 *.exe
+
+# Ignore virtual environments
+.venv

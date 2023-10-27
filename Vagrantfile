@@ -13,6 +13,7 @@ Vagrant.configure("2") do |config|
             node.vm.hostname = "kubenode#{i}"
             ip = "192.168.17.#{i+200}"
             node.vm.network "private_network", ip: ip
+            node.vm.network "forwarded_port", guest: 80, host: 8080 + i
 
             node.vm.provider "virtualbox" do |virtualbox|
                 virtualbox.memory = "2048"
@@ -20,6 +21,13 @@ Vagrant.configure("2") do |config|
                 virtualbox.cpus = 2
                 virtualbox.name = "kubenode#{i}"
             end
+
+            node.vbguest.auto_update = true
+
+            config.vm.provision :ansible do |ansible|
+                ansible.playbook = "./ansible_playbooks/test_playbook.yml"
+            end
+
 
         end
     end

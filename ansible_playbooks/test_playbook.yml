@@ -1,0 +1,20 @@
+---
+- name: Install Apache HTTP Server
+  hosts: all
+  become: yes  # To run tasks with sudo
+
+  tasks:
+    - name: Update package cache
+      apt:
+        update_cache: yes
+
+    - name: Install Apache HTTP Server
+      apt:
+        name: apache2
+        state: present
+
+    - name: Start Apache service
+      service:
+        name: apache2
+        state: started
+        enabled: yes
