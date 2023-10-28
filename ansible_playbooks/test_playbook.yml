@@ -1,5 +1,5 @@
 ---
-- name: Install Apache HTTP Server
+- name: Update system packages # Play to update the system packages
   hosts: all
   become: yes  # To run tasks with sudo
 
@@ -7,6 +7,15 @@
     - name: Update package cache
       apt:
         update_cache: yes
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+        update_cache: yes
+
+- name: Install Apache HTTP Server # Play to install Apache HTTP Server
+  hosts: all
+  become: true
 
     - name: Install Apache HTTP Server
       apt:
@@ -18,3 +27,50 @@
         name: apache2
         state: started
         enabled: yes
+
+- name: Install containerd  # Play to install containerd
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Download containerd archive
+      become: true
+      ansible.builtin.get_url:
+        url: https://github.com/containerd/containerd/releases/download/v1.7.8/containerd-1.7.8-linux-amd64.tar.gz
+        dest: /tmp/containerd-1.7.8-linux-amd64.tar.gz
+
+    - name: Extract containerd archive
+      become: true
+      ansible.builtin.unarchive:
+        src: /tmp/containerd-1.7.8-linux-amd64.tar.gz
+        dest: /usr/local
+        remote_src: true
+
+    - name: Install systemd unit file for containerd
+      become: true
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+        dest: /etc/systemd/system/containerd.service
+
+    - name: Reload systemd
+      become: true
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable and start containerd service
+      become: true
+      ansible.builtin.service:
+        name: containerd
+        state: started
+        enabled: yes
+
+    - name: Clean up downloaded archive
+      become: true
+      ansible.builtin.file:
+        path: /tmp/containerd-1.7.8-linux-amd64.tar.gz
+        state: absent
+      register: cleanup_archive
+
+    - name: Show cleanup task result
+      ansible.builtin.debug:
+        var: cleanup_archive

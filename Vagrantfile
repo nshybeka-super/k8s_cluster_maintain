@@ -5,7 +5,7 @@ Vagrant.configure("2") do |config|
         vb.customize [ "guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 1000 ]
     end
 
-    $num_instances = 3
+    $num_instances = 2
 
     (1..$num_instances).each do |i|
         config.vm.define "kubenode#{i}" do |node|
