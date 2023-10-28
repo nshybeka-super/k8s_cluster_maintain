@@ -17,6 +17,7 @@
   hosts: all
   become: true
 
+  tasks:
     - name: Install Apache HTTP Server
       apt:
         name: apache2

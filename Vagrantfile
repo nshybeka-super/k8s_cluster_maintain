@@ -1,3 +1,20 @@
+# Check for missing plugin
+required_plugins = ["vagrant-vbguest", "virtualbox_WSL2"]
+
+plugin_installed = false
+
+
+required_plugins.each do |plugin|
+    unless Vagrant.has_plugin?(plugin)
+        system("vagrant plugin install #{plugin}")
+        plugin_installed = true
+    end
+end
+
+# If new plugins installed, restart Vagrant process
+if plugin_installed === true
+    exec "vagrant #{ARGV.join' '}"
+end
 
 Vagrant.configure("2") do |config|
 
@@ -5,7 +22,8 @@ Vagrant.configure("2") do |config|
         vb.customize [ "guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 1000 ]
     end
 
-    $num_instances = 2
+    # Defaults for config options
+    $num_instances ||= 1
 
     (1..$num_instances).each do |i|
         config.vm.define "kubenode#{i}" do |node|
@@ -27,8 +45,6 @@ Vagrant.configure("2") do |config|
             config.vm.provision :ansible do |ansible|
                 ansible.playbook = "./ansible_playbooks/test_playbook.yml"
             end
-
-
         end
     end
 end
