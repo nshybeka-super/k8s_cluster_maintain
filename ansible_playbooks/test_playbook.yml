@@ -8,10 +8,11 @@
       apt:
         update_cache: yes
 
-    - name: Upgrade all packages
-      apt:
-        upgrade: dist
-        update_cache: yes
+    # - name: Upgrade all packages
+    #   apt:
+    #     upgrade: dist
+    #     update_cache: yes
+
 
 - name: Install Apache HTTP Server # Play to install Apache HTTP Server
   hosts: all
@@ -29,7 +30,7 @@
         state: started
         enabled: yes
 
-- name: Install containerd  # Play to install containerd
+- name: Install containerd  # Play to install containerd directrly from github release
   hosts: all
   become: true
 
@@ -75,3 +76,36 @@
     - name: Show cleanup task result
       ansible.builtin.debug:
         var: cleanup_archive
+
+- name: Install CNI plugins # (required for most pod network)
+  hosts: all
+  become: true
+  vars:
+    CNI_PLUGINS_VERSION: 'v1.3.0'
+    ARCH: 'amd64'
+    CNI_PLUGINS_DEST: '/opt/cni/bin'
+
+  tasks:
+    - name: Create /opt/cni/bin directoty if not exists
+      file:
+        path: "{{ CNI_PLUGINS_DEST }}"
+        state: directory
+
+    - name: Download CNI plugins archive
+      get_url:
+        url: "https://github.com/containernetworking/plugins/releases/download/{{ CNI_PLUGINS_VERSION }}/cni-plugins-linux-{{ ARCH }}-{{ CNI_PLUGINS_VERSION }}.tgz"
+        dest: "/tmp/cni-plugins.tgz"
+
+    - name: Extract CNI plugins
+      ansible.builtin.unarchive:
+        src: "/tmp/cni-plugins.tgz"
+        dest: "{{ CNI_PLUGINS_DEST }}"
+        remote_src: yes
+        extra_opts: --strip-components=1
+
+    - name: Clean up downloaded archive /tmp/cni-plugins.tgz
+      become: true
+      ansible.builtin.file:
+        path: /tmp/cni-plugins.tgz
+        state: absent
+      register: cleanup_archive

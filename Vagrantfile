@@ -24,6 +24,8 @@ Vagrant.configure("2") do |config|
 
     # Defaults for config options
     $num_instances ||= 1
+    # always use Vagrants secure key
+    config.ssh.insert_key = true
 
     (1..$num_instances).each do |i|
         config.vm.define "kubenode#{i}" do |node|
