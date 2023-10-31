@@ -41,12 +41,12 @@ Vagrant.configure("2") do |config|
                 virtualbox.cpus = 2
                 virtualbox.name = "kubenode#{i}"
             end
-
             node.vbguest.auto_update = true
-
-            config.vm.provision :ansible do |ansible|
-                ansible.playbook = "./ansible_playbooks/test_playbook.yml"
-            end
         end
+    end
+    config.vm.provision "ansible" do |ansible|
+        ansible.playbook = "./ansible_playbooks/test_playbook.yml"
+        ansible.compatibility_mode = "2.0"
+        ansible.raw_arguments = ["--forks=#{$num_instances}", "--flush-cache"]
     end
 end
