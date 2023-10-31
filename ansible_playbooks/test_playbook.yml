@@ -13,22 +13,71 @@
     #     upgrade: dist
     #     update_cache: yes
 
+# - name: Install Apache HTTP Server # Play to install Apache HTTP Server
+#   hosts: all
+#   become: true
 
-- name: Install Apache HTTP Server # Play to install Apache HTTP Server
+#   tasks:
+#     - name: Install Apache HTTP Server
+#       apt:
+#         name: apache2
+#         state: present
+
+#     - name: Start Apache service
+#       service:
+#         name: apache2
+#         state: started
+#         enabled: yes
+
+- name: Some preparation before Kubernetes install
   hosts: all
   become: true
 
   tasks:
-    - name: Install Apache HTTP Server
-      apt:
-        name: apache2
-        state: present
 
-    - name: Start Apache service
-      service:
-        name: apache2
-        state: started
-        enabled: yes
+    - name: Install socat, conntrack, ipvsadm
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - socat
+        - conntrack
+        - ipvsadm
+
+
+    - name: Disable SWAP since kubernetes can't work with swap enabled (1/2)
+      shell: |
+        swapoff -a
+
+    - name: Disable SWAP in fstab since kubernetes can't work with swap enabled (2/2)
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+        replace: '# \1'
+
+    - name: 'Create configuration file: /etc/sysctl.d/k8s.conf'
+      # net.bridge.bridge-nf-call-iptables = 1               => Allow iptables to see bridged traffic
+      # net.ipv4.ip_forward = Enable IP forwarding for IPv4  => (required for pod-to-pod communication)
+      # net.bridge.bridge-nf-call-ip6tables = 1              => Allow IPv6 traffic to pass through iptables
+      copy:
+        dest: /etc/sysctl.d/k8s.conf
+        content: |
+          net.bridge.bridge-nf-call-iptables = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward = 1
+      notify: Apply sysctl settings
+
+    - name: Load overlay kernel modules
+      modprobe:
+        name: '{{ item }}'
+      loop:
+        - overlay # Overlay module required for Containerd to manage the container runtime.
+        - br_netfilter # Bridge Netfilter module required for Kubernetes networking.
+
+  handlers:
+    - name: Apply sysctl settings
+      command: sysctl --system
+
 
 - name: Install containerd  # Play to install containerd directrly from github release
   hosts: all
@@ -77,35 +126,192 @@
       ansible.builtin.debug:
         var: cleanup_archive
 
-- name: Install CNI plugins # (required for most pod network)
-  hosts: all
-  become: true
-  vars:
-    CNI_PLUGINS_VERSION: 'v1.3.0'
-    ARCH: 'amd64'
-    CNI_PLUGINS_DEST: '/opt/cni/bin'
+# Теперь наконфигурируем containderd
 
-  tasks:
-    - name: Create /opt/cni/bin directoty if not exists
+    - name: Create directory for containerd configuration
       file:
-        path: "{{ CNI_PLUGINS_DEST }}"
+        path: /etc/containerd
         state: directory
+        mode: '0755'
 
-    - name: Download CNI plugins archive
-      get_url:
-        url: "https://github.com/containernetworking/plugins/releases/download/{{ CNI_PLUGINS_VERSION }}/cni-plugins-linux-{{ ARCH }}-{{ CNI_PLUGINS_VERSION }}.tgz"
-        dest: "/tmp/cni-plugins.tgz"
+    - name: Generate default containerd configuration
+      shell: containerd config default > /etc/containerd/config.toml
 
-    - name: Extract CNI plugins
-      ansible.builtin.unarchive:
-        src: "/tmp/cni-plugins.tgz"
-        dest: "{{ CNI_PLUGINS_DEST }}"
-        remote_src: yes
-        extra_opts: --strip-components=1
 
-    - name: Clean up downloaded archive /tmp/cni-plugins.tgz
-      become: true
-      ansible.builtin.file:
-        path: /tmp/cni-plugins.tgz
-        state: absent
-      register: cleanup_archive
+    - name: Set using SystemdCgroup to true in containerd  config
+      ansible.builtin.command: sed -i '/\[plugins\."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options\]/,/\[/{s/SystemdCgroup = false/SystemdCgroup = true/}' /etc/containerd/config.toml
+
+    - name: Restart containerd service
+      systemd:
+        name: containerd
+        state: restarted
+
+
+
+# #  Терерь  runc!
+
+#     - name: Download runc binary
+#       get_url:
+#         url: "https://github.com/opencontainers/runc/releases/download/v1.1.10/runc.amd64"
+#         dest: /tmp/runc.amd64
+#       register: download_result
+
+#     - name: Rename runc binary
+#       command: mv /tmp/runc.amd64 /usr/local/sbin/runc
+
+
+#     - name: Make runc executable
+#       file:
+#         path: /usr/local/sbin/runc
+#         mode: '0755'
+
+
+
+
+
+# # Теперь установим  CNI плагины.
+
+
+
+# - name: Install CNI plugins # (required for most pod network)
+#   hosts: all
+#   become: true
+#   vars:
+#     CNI_PLUGINS_VERSION: 'v1.3.0'
+#     ARCH: 'amd64'
+#     CNI_PLUGINS_DEST: '/opt/cni/bin'
+
+#   tasks:
+#     - name: Create /opt/cni/bin directory if not exists
+#       file:
+#         path: "{{ CNI_PLUGINS_DEST }}"
+#         state: directory
+
+#     - name: Download CNI plugins archive
+#       get_url:
+#         url: "https://github.com/containernetworking/plugins/releases/download/{{ CNI_PLUGINS_VERSION }}/cni-plugins-linux-{{ ARCH }}-{{ CNI_PLUGINS_VERSION }}.tgz"
+#         dest: "/tmp/cni-plugins.tgz"
+
+#     - name: Extract CNI plugins
+#       ansible.builtin.unarchive:
+#         src: "/tmp/cni-plugins.tgz"
+#         dest: "{{ CNI_PLUGINS_DEST }}"
+#         remote_src: yes
+#         extra_opts: --strip-components=1
+
+#     - name: Clean up downloaded archive /tmp/cni-plugins.tgz
+#       become: true
+#       ansible.builtin.file:
+#         path: /tmp/cni-plugins.tgz
+#         state: absent
+#       register: cleanup_archive
+
+
+# # Install kubelet, kubectl, kubeadm and tune a kubelet systemd service
+
+# - name: Install kubelet, kubectl, kubeadm and tune a kubelet systemd service
+#   hosts: all
+#   become: true
+#   vars:
+#     CRICTL_VERSION: 'v1.28.0'
+#     K8S_BIN_INSTALL_DIR: '/usr/local/bin'
+#     ARCH: 'amd64'
+#     TEMP_DIR: '/tmp'
+#     K8S_RELEASE_REPO_VERSION: 'v0.16.3'
+
+#   tasks:
+#     - name: Retrieve Kubernetes stable release version
+#       uri:
+#         url: "https://dl.k8s.io/release/stable.txt"
+#         return_content: yes
+#       register: release_content
+
+#     - set_fact:
+#         LATEST_STABLE_K8S_RELEASE_VERSION: "{{ release_content.content | regex_replace('^(.*)$', '\\1') }}"
+
+
+
+
+    # - name: Create K8S_BIN_INSTALL_DIR directory for installation
+    #   file:
+    #     path: "{{ K8S_BIN_INSTALL_DIR }}"
+    #     state: directory
+
+    # - name: Download crictl to temporary directory
+    #   get_url:
+    #     url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ CRICTL_VERSION }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
+    #     dest: "{{ TEMP_DIR }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
+
+    # - name: Extract crictl to the installation directory
+    #   ansible.builtin.unarchive:
+    #     src: "{{ TEMP_DIR }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
+    #     dest: "{{ K8S_BIN_INSTALL_DIR }}"
+    #     remote_src: yes
+
+    # - name: Clean up downloaded archive from the temporary directory
+    #   become: true
+    #   ansible.builtin.file:
+    #     path: "{{ TEMP_DIR }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
+    #     state: absent
+    #   register: cleanup_archive
+
+
+
+
+
+    # - name: Download Kubernetes binaries to the installation directory and set permissions 0755
+    #   ansible.builtin.get_url:
+    #     url: "https://dl.k8s.io/release/{{ LATEST_STABLE_K8S_RELEASE_VERSION }}/bin/linux/{{ ARCH }}/{{ item }}"
+    #     dest: "{{ K8S_BIN_INSTALL_DIR }}/{{ item }}"
+    #     mode: '0755'
+    #   loop:
+    #     - kubeadm
+    #     - kubelet
+
+    # # Variable denoting the version of the Kubernetes releases repository for fetching kubelet.service files
+    # # K8S_RELEASE_REPO_VERSION
+    # - name: Fetch kubelet.service file from Kubernetes releases repository
+    #   get_url:
+    #     url: https://raw.githubusercontent.com/kubernetes/release/{{K8S_RELEASE_REPO_VERSION }}/cmd/krel/templates/latest/kubelet/kubelet.service
+    #     dest: '/etc/systemd/system/kubelet.service'
+
+    # - name: Modify and save kubelet.service with K8S_BIN_INSTALL_DIR in destination
+    #   ansible.builtin.replace:
+    #     path: "/etc/systemd/system/kubelet.service"
+    #     regexp: '/usr/bin'
+    #     replace: "{{ K8S_BIN_INSTALL_DIR }}"
+
+    # - name: Create directory for additional configuration files
+    #   ansible.builtin.file:
+    #     path: "/etc/systemd/system/kubelet.service.d"
+    #     state: directory
+
+    # - name: Fetch and modify 10-kubeadm.conf file with K8S_BIN_INSTALL_DIR
+    #   get_url:
+    #     url: "https://raw.githubusercontent.com/kubernetes/release/{{K8S_RELEASE_REPO_VERSION }}/cmd/krel/templates/latest/kubeadm/10-kubeadm.conf"
+    #     dest: '/etc/systemd/system/kubelet.service.d/10-kubeadm.conf'
+
+    # - name: Modify and save 10-kubeadm.conf with DOWNLOAD_DIR in destination
+    #   ansible.builtin.replace:
+    #     path: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+    #     regexp: '/usr/bin'
+    #     replace: "{{ K8S_BIN_INSTALL_DIR }}"
+
+    # # curl -LO https://dl.k8s.io/release/v1.28.3/bin/linux/amd64/kubectl
+    # - name: Download kubectl
+    #   get_url:
+    #     url: https://dl.k8s.io/release/{{ LATEST_STABLE_K8S_RELEASE_VERSION }}/bin/linux/amd64/kubectl
+    #     dest: /usr/local/bin/kubectl
+
+    # - name: Set permissions for file
+    #   ansible.builtin.file:
+    #     path: /usr/local/bin/kubectl
+    #     owner: root
+    #     group: root
+    #     mode: '0755'
+
+    # - name: Enable and start the kubelet service
+    #   ansible.builtin.service:
+    #     name: kubelet
+    #     enabled: yes
+    #     state: started
