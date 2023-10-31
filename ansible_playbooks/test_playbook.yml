@@ -109,3 +109,54 @@
         path: /tmp/cni-plugins.tgz
         state: absent
       register: cleanup_archive
+
+- name: Install Kubelet, Kubectl, Kubeadm and add a kubelet systemd service
+  hosts: all
+  become: true
+  vars:
+    CRICTL_VERSION: 'v1.28.0'
+    K8S_BIN_INSTALL_DIR: '/usr/local/bin'
+    ARCH: 'amd64'
+    TEMP_DIR: '/tmp'
+
+  tasks:
+    - name: Create K8S_BIN_INSTALL_DIR directory for installation
+      file:
+        path: "{{ K8S_BIN_INSTALL_DIR }}"
+        state: directory
+
+    - name: Download crictl to temporary directory
+      get_url:
+        url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ CRICTL_VERSION }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
+        dest: "{{ TEMP_DIR }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
+
+    - name: Extract crictl to the installation directory
+      ansible.builtin.unarchive:
+        src: "{{ TEMP_DIR }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
+        dest: "{{ K8S_BIN_INSTALL_DIR }}"
+        remote_src: yes
+
+    - name: Clean up downloaded archive from the temporary directory
+      become: true
+      ansible.builtin.file:
+        path: "{{ TEMP_DIR }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
+        state: absent
+      register: cleanup_archive
+
+    - name: Retrieve Kubernetes stable release version
+      uri:
+        url: "https://dl.k8s.io/release/stable.txt"
+        return_content: yes
+      register: release_content
+
+    - set_fact:
+        K8S_RELEASE_VERSION: "{{ release_content.content | regex_replace('^(.*)$', '\\1') }}"
+
+    - name: Download Kubernetes binaries to the installation directory and set permissions 0755
+      ansible.builtin.get_url:
+        url: "https://dl.k8s.io/release/{{ K8S_RELEASE_VERSION }}/bin/linux/{{ ARCH }}/{{ item }}"
+        dest: "{{ K8S_BIN_INSTALL_DIR }}/{{ item }}"
+        mode: '0755'
+      loop:
+        - kubeadm
+        - kubelet
