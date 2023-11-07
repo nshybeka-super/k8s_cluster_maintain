@@ -8,27 +8,6 @@
       apt:
         update_cache: yes
 
-    # - name: Upgrade all packages
-    #   apt:
-    #     upgrade: dist
-    #     update_cache: yes
-
-# - name: Install Apache HTTP Server # Play to install Apache HTTP Server
-#   hosts: all
-#   become: true
-
-#   tasks:
-#     - name: Install Apache HTTP Server
-#       apt:
-#         name: apache2
-#         state: present
-
-#     - name: Start Apache service
-#       service:
-#         name: apache2
-#         state: started
-#         enabled: yes
-
 - name: Some preparation before Kubernetes install
   hosts: all
   become: true
@@ -150,20 +129,20 @@
 
 # #  Терерь  runc!
 
-#     - name: Download runc binary
-#       get_url:
-#         url: "https://github.com/opencontainers/runc/releases/download/v1.1.10/runc.amd64"
-#         dest: /tmp/runc.amd64
-#       register: download_result
+    - name: Download runc binary
+      get_url:
+        url: "https://github.com/opencontainers/runc/releases/download/v1.1.10/runc.amd64"
+        dest: /tmp/runc.amd64
+      register: download_result
 
-#     - name: Rename runc binary
-#       command: mv /tmp/runc.amd64 /usr/local/sbin/runc
+    - name: Rename runc binary
+      command: mv /tmp/runc.amd64 /usr/local/sbin/runc
 
 
-#     - name: Make runc executable
-#       file:
-#         path: /usr/local/sbin/runc
-#         mode: '0755'
+    - name: Make runc executable
+      file:
+        path: /usr/local/sbin/runc
+        mode: '0755'
 
 
 
@@ -173,62 +152,52 @@
 
 
 
-# - name: Install CNI plugins # (required for most pod network)
-#   hosts: all
-#   become: true
-#   vars:
-#     CNI_PLUGINS_VERSION: 'v1.3.0'
-#     ARCH: 'amd64'
-#     CNI_PLUGINS_DEST: '/opt/cni/bin'
+- name: Install CNI plugins # (required for most pod network)
+  hosts: all
+  become: true
+  # vars:
+  #   CNI_PLUGINS_VERSION: 'v1.3.0'
+  #   ARCH: 'amd64'
+  #   CNI_PLUGINS_DEST: '/opt/cni/bin'
 
-#   tasks:
-#     - name: Create /opt/cni/bin directory if not exists
-#       file:
-#         path: "{{ CNI_PLUGINS_DEST }}"
-#         state: directory
+  tasks:
+    - name: Create /opt/cni/bin directory if not exists
+      file:
+        path: '/opt/cni/bin'
+        state: directory
 
-#     - name: Download CNI plugins archive
-#       get_url:
-#         url: "https://github.com/containernetworking/plugins/releases/download/{{ CNI_PLUGINS_VERSION }}/cni-plugins-linux-{{ ARCH }}-{{ CNI_PLUGINS_VERSION }}.tgz"
-#         dest: "/tmp/cni-plugins.tgz"
+    - name: Download CNI plugins archive
+      get_url:
+        url: "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz"
+        dest: "/tmp/cni-plugins-linux-amd64-v1.3.0.tgz"
 
-#     - name: Extract CNI plugins
-#       ansible.builtin.unarchive:
-#         src: "/tmp/cni-plugins.tgz"
-#         dest: "{{ CNI_PLUGINS_DEST }}"
-#         remote_src: yes
-#         extra_opts: --strip-components=1
+    - name: Extract CNI plugins
+      ansible.builtin.unarchive:
+        src: '/tmp/cni-plugins-linux-amd64-v1.3.0.tgz'
+        dest: '/opt/cni/bin'
+        remote_src: yes
 
-#     - name: Clean up downloaded archive /tmp/cni-plugins.tgz
-#       become: true
-#       ansible.builtin.file:
-#         path: /tmp/cni-plugins.tgz
-#         state: absent
-#       register: cleanup_archive
+    - name: Clean up downloaded archive /tmp/cni-plugins.tgz
+      become: true
+      ansible.builtin.file:
+        path: '/tmp/cni-plugins-linux-amd64-v1.3.0.tgz'
+        state: absent
+      register: cleanup_archive
 
 
-# # Install kubelet, kubectl, kubeadm and tune a kubelet systemd service
+# Install kubelet, kubectl, kubeadm and tune a kubelet systemd service
 
-# - name: Install kubelet, kubectl, kubeadm and tune a kubelet systemd service
-#   hosts: all
-#   become: true
-#   vars:
-#     CRICTL_VERSION: 'v1.28.0'
-#     K8S_BIN_INSTALL_DIR: '/usr/local/bin'
-#     ARCH: 'amd64'
-#     TEMP_DIR: '/tmp'
-#     K8S_RELEASE_REPO_VERSION: 'v0.16.3'
+- name: Install kubelet, kubectl, kubeadm and tune a kubelet systemd service
+  hosts: all
+  become: true
+  vars:
+    # CRICTL_VERSION: 'v1.28.0'
+    # K8S_BIN_INSTALL_DIR: '/usr/local/bin'
+    # ARCH: 'amd64'
+    # TEMP_DIR: '/tmp'
+    K8S_RELEASE_REPO_VERSION: 'v0.16.3'
 
-#   tasks:
-#     - name: Retrieve Kubernetes stable release version
-#       uri:
-#         url: "https://dl.k8s.io/release/stable.txt"
-#         return_content: yes
-#       register: release_content
-
-#     - set_fact:
-#         LATEST_STABLE_K8S_RELEASE_VERSION: "{{ release_content.content | regex_replace('^(.*)$', '\\1') }}"
-
+  tasks:
 
 
 
@@ -237,81 +206,86 @@
     #     path: "{{ K8S_BIN_INSTALL_DIR }}"
     #     state: directory
 
-    # - name: Download crictl to temporary directory
-    #   get_url:
-    #     url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ CRICTL_VERSION }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
-    #     dest: "{{ TEMP_DIR }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
+    - name: Download crictl to temporary directory
+      get_url:
+        url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.28.0/crictl-v1.28.0-linux-amd64.tar.gz"
+        dest: "/tmp/crictl-v1.28.0-linux-amd64.tar.gz"
 
-    # - name: Extract crictl to the installation directory
-    #   ansible.builtin.unarchive:
-    #     src: "{{ TEMP_DIR }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
-    #     dest: "{{ K8S_BIN_INSTALL_DIR }}"
-    #     remote_src: yes
+    - name: Extract crictl to the installation directory
+      ansible.builtin.unarchive:
+        src: "/tmp/crictl-v1.28.0-linux-amd64.tar.gz"
+        dest: "/usr/local/bin"
+        remote_src: yes
 
-    # - name: Clean up downloaded archive from the temporary directory
-    #   become: true
-    #   ansible.builtin.file:
-    #     path: "{{ TEMP_DIR }}/crictl-{{ CRICTL_VERSION }}-linux-{{ ARCH }}.tar.gz"
-    #     state: absent
-    #   register: cleanup_archive
+    - name: Clean up downloaded archive from the temporary directory
+      become: true
+      ansible.builtin.file:
+        path: "/tmp/crictl-v1.28.0-linux-amd64.tar.gz"
+        state: absent
+      register: cleanup_archive
 
+    - name: Retrieve Kubernetes stable release version
+      uri:
+        url: "https://dl.k8s.io/release/stable.txt"
+        return_content: yes
+      register: release_content
 
+    - set_fact:
+        LATEST_STABLE_K8S_RELEASE_VERSION: "{{ release_content.content | regex_replace('^(.*)$', '\\1') }}"
 
-
-
-    # - name: Download Kubernetes binaries to the installation directory and set permissions 0755
-    #   ansible.builtin.get_url:
-    #     url: "https://dl.k8s.io/release/{{ LATEST_STABLE_K8S_RELEASE_VERSION }}/bin/linux/{{ ARCH }}/{{ item }}"
-    #     dest: "{{ K8S_BIN_INSTALL_DIR }}/{{ item }}"
-    #     mode: '0755'
-    #   loop:
-    #     - kubeadm
-    #     - kubelet
+    - name: Download Kubernetes binaries to the installation directory and set permissions 0755
+      ansible.builtin.get_url:
+        url: "https://dl.k8s.io/release/{{ LATEST_STABLE_K8S_RELEASE_VERSION }}/bin/linux/amd64/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        mode: '0755'
+      loop:
+        - kubeadm
+        - kubelet
 
     # # Variable denoting the version of the Kubernetes releases repository for fetching kubelet.service files
-    # # K8S_RELEASE_REPO_VERSION
-    # - name: Fetch kubelet.service file from Kubernetes releases repository
-    #   get_url:
-    #     url: https://raw.githubusercontent.com/kubernetes/release/{{K8S_RELEASE_REPO_VERSION }}/cmd/krel/templates/latest/kubelet/kubelet.service
-    #     dest: '/etc/systemd/system/kubelet.service'
 
-    # - name: Modify and save kubelet.service with K8S_BIN_INSTALL_DIR in destination
-    #   ansible.builtin.replace:
-    #     path: "/etc/systemd/system/kubelet.service"
-    #     regexp: '/usr/bin'
-    #     replace: "{{ K8S_BIN_INSTALL_DIR }}"
+    # K8S_RELEASE_REPO_VERSION
+    - name: Fetch kubelet.service file from Kubernetes releases repository
+      get_url:
+        url: https://raw.githubusercontent.com/kubernetes/release/{{K8S_RELEASE_REPO_VERSION }}/cmd/krel/templates/latest/kubelet/kubelet.service
+        dest: '/etc/systemd/system/kubelet.service'
 
-    # - name: Create directory for additional configuration files
-    #   ansible.builtin.file:
-    #     path: "/etc/systemd/system/kubelet.service.d"
-    #     state: directory
+    - name: Modify and save kubelet.service with K8S_BIN_INSTALL_DIR in destination
+      ansible.builtin.replace:
+        path: "/etc/systemd/system/kubelet.service"
+        regexp: '/usr/bin'
+        replace: "/usr/local/bin"
 
-    # - name: Fetch and modify 10-kubeadm.conf file with K8S_BIN_INSTALL_DIR
-    #   get_url:
-    #     url: "https://raw.githubusercontent.com/kubernetes/release/{{K8S_RELEASE_REPO_VERSION }}/cmd/krel/templates/latest/kubeadm/10-kubeadm.conf"
-    #     dest: '/etc/systemd/system/kubelet.service.d/10-kubeadm.conf'
+    - name: Create directory for additional configuration files
+      ansible.builtin.file:
+        path: "/etc/systemd/system/kubelet.service.d"
+        state: directory
 
-    # - name: Modify and save 10-kubeadm.conf with DOWNLOAD_DIR in destination
-    #   ansible.builtin.replace:
-    #     path: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
-    #     regexp: '/usr/bin'
-    #     replace: "{{ K8S_BIN_INSTALL_DIR }}"
+    - name: Fetch and 10-kubeadm.conf file with K8S_BIN_INSTALL_DIR
+      get_url:
+        url: "https://raw.githubusercontent.com/kubernetes/release/{{K8S_RELEASE_REPO_VERSION }}/cmd/krel/templates/latest/kubeadm/10-kubeadm.conf"
+        dest: '/etc/systemd/system/kubelet.service.d/10-kubeadm.conf'
 
-    # # curl -LO https://dl.k8s.io/release/v1.28.3/bin/linux/amd64/kubectl
-    # - name: Download kubectl
-    #   get_url:
-    #     url: https://dl.k8s.io/release/{{ LATEST_STABLE_K8S_RELEASE_VERSION }}/bin/linux/amd64/kubectl
-    #     dest: /usr/local/bin/kubectl
+    - name: Modify and save 10-kubeadm.conf with DOWNLOAD_DIR in destination
+      ansible.builtin.replace:
+        path: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+        regexp: '/usr/bin'
+        replace: '/usr/local/bin'
 
-    # - name: Set permissions for file
-    #   ansible.builtin.file:
-    #     path: /usr/local/bin/kubectl
-    #     owner: root
-    #     group: root
-    #     mode: '0755'
+    - name: Enable and start the kubelet service
+      ansible.builtin.service:
+        name: kubelet
+        enabled: yes
+        state: started
 
-    # - name: Enable and start the kubelet service
-    #   ansible.builtin.service:
-    #     name: kubelet
-    #     enabled: yes
-    #     state: started
+    - name: Download kubectl
+      get_url:
+        url: https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+
+    - name: Set permissions for file
+      ansible.builtin.file:
+        path: /usr/local/bin/kubectl
+        owner: root
+        group: root
+        mode: '0755'
