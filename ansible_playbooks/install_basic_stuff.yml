@@ -16,12 +16,11 @@
 
     - name: Install socat, conntrack, ipvsadm
       apt:
-        name: "{{ item }}"
-        state: present
-      loop:
+        pkg:
         - socat
         - conntrack
         - ipvsadm
+        state: present
 
 
     - name: Disable SWAP since kubernetes can't work with swap enabled (1/2)
@@ -60,24 +59,10 @@
           overlay
           br_netfilter
 
-    # - name: 'Create hosts file'
-    #   copy:
-    #     dest: /etc/hosts
-    #     content: |
-    #       192.168.17.201 kubentes1
-    #       192.168.17.202 kubentes2
-    #       192.168.17.203 kubentes3
-
-    - name: Generate hosts file on host system
-      command: ./hosts_file_generation.sh {{ num_masters }}  {{ num_workers }}
-      delegate_to: localhost
-
     - name: Copy just generated hosts file to node
       copy:
         src: ./hosts
         dest: /etc/hosts
-
-
 
   handlers:
     - name: Apply sysctl settings
