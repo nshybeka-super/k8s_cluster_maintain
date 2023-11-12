@@ -53,10 +53,35 @@
         - overlay # Overlay module required for Containerd to manage the container runtime.
         - br_netfilter # Bridge Netfilter module required for Kubernetes networking.
 
+    - name: 'Create modules configuration file: /etc/modules-load.d/k8s.conf'
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+
+    # - name: 'Create hosts file'
+    #   copy:
+    #     dest: /etc/hosts
+    #     content: |
+    #       192.168.17.201 kubentes1
+    #       192.168.17.202 kubentes2
+    #       192.168.17.203 kubentes3
+
+    - name: Generate hosts file on host system
+      command: ./hosts_file_generation.sh {{ num_masters }}  {{ num_workers }}
+      delegate_to: localhost
+
+    - name: Copy just generated hosts file to node
+      copy:
+        src: ./hosts
+        dest: /etc/hosts
+
+
+
   handlers:
     - name: Apply sysctl settings
       command: sysctl --system
-
 
 - name: Install containerd  # Play to install containerd directrly from github release
   hosts: all
@@ -124,10 +149,6 @@
       systemd:
         name: containerd
         state: restarted
-
-
-
-# #  Терерь  runc!
 
     - name: Download runc binary
       get_url:
